@@ -6,6 +6,9 @@ const runMigrations = require('./utils/runMigrations');
 const runSeeds = require('./utils/runSeeds');
 const authRoutes = require('./routes/authRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
+const userRoutes = require('./routes/userRoutes');
+
+
 
 
 
@@ -16,6 +19,7 @@ dotenv.config();
 const app = express();
 
 // Middleware
+app.use('/api/users', userRoutes);
 app.use(express.json());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
