@@ -165,8 +165,27 @@ async function updateTenant(req, res) {
     });
   }
 }
+// GET /api/tenants
+async function listTenants(req, res) {
+  try {
+    const result = await db.query(`
+      SELECT id, name, subdomain, status, subscription_plan, max_users, max_projects, created_at
+      FROM tenants
+      ORDER BY created_at DESC
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows
+    });
+  } catch (err) {
+    console.error('List tenants error', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
 
 module.exports = {
   getTenant,
-  updateTenant
+  updateTenant,
+  listTenants
 };

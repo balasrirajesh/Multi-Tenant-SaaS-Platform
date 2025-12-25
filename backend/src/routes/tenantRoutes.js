@@ -5,6 +5,14 @@ const authMiddleware = require('../middleware/authMiddleware');
 const allowRoles = require('../middleware/roleMiddleware');
 const tenantGuard = require('../middleware/tenantMiddleware');
 const { getTenant, updateTenant } = require('../controllers/tenantController');
+const { listTenants } = require('../controllers/tenantController');
+
+router.get(
+  '/',
+  authMiddleware,
+  allowRoles('super_admin'),
+  listTenants
+);
 
 // Get tenant details
 router.get(
