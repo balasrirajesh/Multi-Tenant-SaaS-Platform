@@ -7,6 +7,9 @@ const runSeeds = require('./utils/runSeeds');
 const authRoutes = require('./routes/authRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const userRoutes = require('./routes/userRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+app.use('/api/tasks', taskRoutes);
+
 
 
 
