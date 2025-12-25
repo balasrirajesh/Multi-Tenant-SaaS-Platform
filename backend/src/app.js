@@ -1,3 +1,4 @@
+const db = require('./config/db');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -17,7 +18,7 @@ app.use(cors({
 // Health Check Endpoint (MANDATORY)
 app.get('/api/health', async (req, res) => {
   try {
-    // Database check will be added later
+    await db.query('SELECT 1');
     res.status(200).json({
       status: 'ok',
       database: 'connected'
@@ -29,6 +30,7 @@ app.get('/api/health', async (req, res) => {
     });
   }
 });
+
 
 // Default route
 app.get('/', (req, res) => {
