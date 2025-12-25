@@ -4,6 +4,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const runMigrations = require('./utils/runMigrations');
 const runSeeds = require('./utils/runSeeds');
+const authRoutes = require('./routes/authRoutes');
+
 
 
 // Load environment variables
@@ -17,6 +19,7 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
+app.use('/api/auth', authRoutes);
 
 // Health Check Endpoint (MANDATORY)
 app.get('/api/health', async (req, res) => {
