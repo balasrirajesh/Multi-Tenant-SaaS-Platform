@@ -5,6 +5,8 @@ const dotenv = require('dotenv');
 const runMigrations = require('./utils/runMigrations');
 const runSeeds = require('./utils/runSeeds');
 const authRoutes = require('./routes/authRoutes');
+const tenantRoutes = require('./routes/tenantRoutes');
+
 
 
 
@@ -20,6 +22,8 @@ app.use(cors({
   credentials: true
 }));
 app.use('/api/auth', authRoutes);
+app.use('/api/tenants', tenantRoutes);
+
 
 // Health Check Endpoint (MANDATORY)
 app.get('/api/health', async (req, res) => {
