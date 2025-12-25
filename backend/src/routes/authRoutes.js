@@ -1,5 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const { login } = require('../controllers/authController');
+
+router.post('/login', login);
+
 
 // Placeholder routes (logic will be added step-by-step)
 router.post('/register-tenant', (req, res) => {
