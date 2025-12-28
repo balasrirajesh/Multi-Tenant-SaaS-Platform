@@ -6,6 +6,11 @@ const allowRoles = require('../middleware/roleMiddleware');
 const tenantGuard = require('../middleware/tenantMiddleware');
 const { getTenant, updateTenant } = require('../controllers/tenantController');
 const { listTenants } = require('../controllers/tenantController');
+const { listTenants, createTenant } = require('../controllers/tenantController'); // Import it here
+
+// ...
+router.post('/', auth, allow('super_admin'), createTenant); // Use it here
+router.post('/', auth, allow('super_admin'), createTenant);//use it to super admin to create a tenant
 
 router.get(
   '/',
