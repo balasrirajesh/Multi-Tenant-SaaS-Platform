@@ -1,63 +1,221 @@
+// const db = require('../config/db'); // db is the pool directly
+// const bcrypt = require('bcryptjs');
+// const { logAudit } = require('../utils/auditLogger');
+
+// // 1. List Users
+// async function listUsers(req, res) {
+//   const { tenantId, role } = req.user;
+//   const targetTenantId = req.params.tenantId;
+
+//   // Security: Ensure Tenant Admin only accesses their own tenant
+//   if (role !== 'super_admin' && tenantId !== targetTenantId) {
+//     return res.status(403).json({ success: false, message: 'Access denied' });
+//   }
+
+//   try {
+//     const result = await db.query(
+//       `SELECT id, email, full_name, role, is_active, created_at 
+//        FROM users 
+//        WHERE tenant_id = $1 
+//        ORDER BY created_at DESC`,
+//       [targetTenantId]
+//     );
+//     res.json({ success: true, data: result.rows });
+//   } catch (err) {
+//     console.error("List Users Error:", err);
+//     res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// }
+
+// // 2. Create User
+// async function createUser(req, res) {
+//   const { tenantId: requesterTenantId, role: requesterRole } = req.user;
+//   const targetTenantId = req.params.tenantId;
+//   const { email, password, fullName, role } = req.body; // Expecting 'fullName' from frontend
+
+//   // Security Check
+//   if (requesterRole !== 'super_admin' && requesterTenantId !== targetTenantId) {
+//     return res.status(403).json({ success: false, message: 'Access denied' });
+//   }
+
+//   try {
+//     // A. Check Subscription Limits (CRITICAL REQUIREMENT)
+//     const limitCheck = await db.query(
+//       `SELECT max_users, 
+//        (SELECT COUNT(*) FROM users WHERE tenant_id = $1) as current_count 
+//        FROM tenants WHERE id = $1`,
+//       [targetTenantId]
+//     );
+
+//     if (limitCheck.rowCount === 0) return res.status(404).json({ message: 'Tenant not found' });
+
+//     const { max_users, current_count } = limitCheck.rows[0];
+    
+//     if (parseInt(current_count) >= max_users) {
+//       return res.status(403).json({ 
+//         success: false, 
+//         message: `Plan limit reached (${max_users} users). Upgrade to add more.` 
+//       });
+//     }
+
+//     // B. Check if email exists
+//     const emailCheck = await db.query('SELECT 1 FROM users WHERE email = $1', [email]);
+//     if (emailCheck.rowCount > 0) {
+//       return res.status(400).json({ success: false, message: 'Email already exists' });
+//     }
+
+//     // C. Hash Password
+//     const hash = await bcrypt.hash(password, 10);
+
+//     // D. Insert into DB (Using full_name)
+//     const result = await db.query(
+//       `INSERT INTO users (tenant_id, email, password_hash, full_name, role)
+//        VALUES ($1, $2, $3, $4, $5) 
+//        RETURNING id, email, full_name, role, is_active, created_at`,
+//       [targetTenantId, email, hash, fullName, role || 'user']
+//     );
+
+//     const newUser = result.rows[0];
+
+//     // E. Log Audit
+//     await logAudit({ 
+//       tenantId: targetTenantId, 
+//       userId: req.user.userId, 
+//       action: 'CREATE_USER', 
+//       entityType: 'user', 
+//       entityId: newUser.id,
+//       ipAddress: req.ip
+//     });
+
+//     res.status(201).json({ success: true, data: newUser, message: 'User added successfully' });
+
+//   } catch (err) {
+//     console.error("Create User Error:", err);
+//     res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// }
+
+// module.exports = { listUsers, createUser };
+
 const db = require('../config/db');
-const bcrypt = require('bcryptjs'); // Use bcryptjs for compatibility
+const bcrypt = require('bcryptjs');
 const { logAudit } = require('../utils/auditLogger');
 
-// 1. List Users
+// Helper to validate UUID
+const isUUID = (str) => {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return regex.test(str);
+};
+
+// 1. LIST USERS
 async function listUsers(req, res) {
   const { tenantId, role } = req.user;
+  const targetTenantId = req.params.tenantId;
+
+  // Validation: Stop "undefined" errors
+  if (!targetTenantId || !isUUID(targetTenantId)) {
+    return res.status(400).json({ success: false, message: 'Invalid Tenant ID provided' });
+  }
+
+  // Security: Ensure Tenant Admin only accesses their own tenant
+  if (role !== 'super_admin' && tenantId !== targetTenantId) {
+    return res.status(403).json({ success: false, message: 'Access denied' });
+  }
 
   try {
-    let result;
-    if (role === 'super_admin') {
-      // Super Admin: See ALL users + their company name
-      result = await db.query(
-        `SELECT u.id, u.email, u.name, u.role, u.tenant_id, t.name as tenant_name 
-         FROM users u
-         LEFT JOIN tenants t ON u.tenant_id = t.id
-         ORDER BY u.created_at DESC`
-      );
-    } else {
-      // Tenant Admin: See ONLY users in their company
-      result = await db.query(
-        `SELECT id, email, name, role FROM users WHERE tenant_id = $1 ORDER BY created_at DESC`,
-        [tenantId]
-      );
-    }
+    const result = await db.query(
+      `SELECT id, email, full_name, role, is_active, created_at 
+       FROM users 
+       WHERE tenant_id = $1 
+       ORDER BY created_at DESC`,
+      [targetTenantId]
+    );
     res.json({ success: true, data: result.rows });
   } catch (err) {
-    console.error("List Users Error:", err);
+    console.error("List Users Error:", err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 }
 
-// 2. Create User (Fixes "Invalid Credentials")
+// 2. CREATE USER
 async function createUser(req, res) {
-  const { tenantId, userId } = req.user; // The person CREATING the user
-  const { email, password, name, role } = req.body; // Note: using 'name' not 'fullName'
+  console.log("Create User Request:", req.body); // Debug log
+
+  const { tenantId: requesterTenantId, role: requesterRole } = req.user;
+  const targetTenantId = req.params.tenantId;
+  const { email, password, fullName, role } = req.body;
+
+  // Validation: Stop "undefined" errors
+  if (!targetTenantId || !isUUID(targetTenantId)) {
+    return res.status(400).json({ success: false, message: 'Invalid Tenant ID provided' });
+  }
+
+  // Security Check
+  if (requesterRole !== 'super_admin' && requesterTenantId !== targetTenantId) {
+    return res.status(403).json({ success: false, message: 'Access denied: Tenant mismatch' });
+  }
 
   try {
-    // Hash the password (CRITICAL STEP)
-    const hash = await bcrypt.hash(password, 10);
-
-    // Insert into DB
-    const result = await db.query(
-      `INSERT INTO users (tenant_id, email, password_hash, name, role)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role`,
-      [tenantId, email, hash, name, role]
+    // A. Check Subscription Limits
+    const limitCheck = await db.query(
+      `SELECT max_users, 
+       (SELECT COUNT(*) FROM users WHERE tenant_id = $1) as current_count 
+       FROM tenants WHERE id = $1`,
+      [targetTenantId]
     );
 
-    // Log the action
-    await logAudit({ tenantId, userId, action: 'CREATE_USER', entityType: 'user', entityId: result.rows[0].id });
+    if (limitCheck.rowCount === 0) return res.status(404).json({ message: 'Tenant not found' });
 
-    res.status(201).json({ success: true, data: result.rows[0] });
+    const { max_users, current_count } = limitCheck.rows[0];
+    
+    if (parseInt(current_count) >= max_users) {
+      return res.status(403).json({ 
+        success: false, 
+        message: `Plan limit reached (${max_users} users). Upgrade to add more.` 
+      });
+    }
+
+    // B. Check if email exists
+    const emailCheck = await db.query('SELECT 1 FROM users WHERE email = $1', [email]);
+    if (emailCheck.rowCount > 0) {
+      return res.status(400).json({ success: false, message: 'Email already exists' });
+    }
+
+    // C. Hash Password
+    const hash = await bcrypt.hash(password, 10);
+
+    // D. Insert into DB
+    const result = await db.query(
+      `INSERT INTO users (tenant_id, email, password_hash, full_name, role)
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, email, full_name, role, is_active, created_at`,
+      [targetTenantId, email, hash, fullName, role || 'user']
+    );
+
+    const newUser = result.rows[0];
+
+    // E. Audit Log (Safe Mode)
+    try {
+      const activeUserId = req.user.id || req.user.userId;
+      if (activeUserId && isUUID(activeUserId)) {
+        await logAudit({ 
+          tenantId: targetTenantId, 
+          userId: activeUserId, 
+          action: 'CREATE_USER', 
+          entityType: 'user', 
+          entityId: newUser.id,
+          ipAddress: req.ip || '0.0.0.0'
+        });
+      }
+    } catch (auditErr) {
+      console.warn("Audit log skipped:", auditErr.message);
+    }
+
+    res.status(201).json({ success: true, data: newUser, message: 'User added successfully' });
 
   } catch (err) {
-    console.error("Create User Error:", err);
-    // Handle duplicate email error
-    if (err.code === '23505') {
-       return res.status(400).json({ success: false, message: 'Email already exists' });
-    }
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error("Create User CRASH:", err);
+    res.status(500).json({ success: false, message: 'Server error: ' + err.message });
   }
 }
 
