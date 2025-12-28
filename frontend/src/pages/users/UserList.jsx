@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, User, Trash2, Shield, ShieldAlert } from 'lucide-react';
-// Components
+import { Plus, User, Trash2, Pencil, Shield, ShieldAlert } from 'lucide-react'; // Added Pencil
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import Modal from '../../components/Modal';
@@ -11,30 +10,26 @@ const UserList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
+  // State for Editing
+  const [editingUser, setEditingUser] = useState(null); 
+
   // Form State
-  const [newUser, setNewUser] = useState({ 
+  const [formData, setFormData] = useState({ 
     email: '', 
     fullName: '', 
     password: '', 
     role: 'user' 
   });
 
-  // --- IMPROVED: Get Tenant ID Safely ---
+  // Get Tenant ID Safely
   const getTenantId = () => {
     const userString = localStorage.getItem('user');
     if (!userString) return null;
-    
     try {
       const parsed = JSON.parse(userString);
-      // Sometimes the user data is nested inside "user" object, sometimes it's flat
       const userData = parsed.user || parsed; 
-      
-      // CHECK BOTH VARIATIONS (camelCase and snake_case)
       return userData.tenantId || userData.tenant_id;
-    } catch (e) {
-      console.error("Error parsing user data:", e);
-      return null;
-    }
+    } catch (e) { return null; }
   };
 
   const tenantId = getTenantId();
@@ -42,62 +37,88 @@ const UserList = () => {
 
   // 1. Fetch Users
   const fetchUsers = async () => {
-    if (!tenantId) return; // Don't fetch if we don't have an ID
-
+    if (!tenantId) return;
     try {
       const res = await axios.get(`http://localhost:5000/api/tenants/${tenantId}/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.data.success) {
-        setUsers(res.data.data);
-      }
+      if (res.data.success) setUsers(res.data.data);
     } catch (err) {
       console.error("Failed to fetch users", err);
     }
   };
 
   useEffect(() => {
-    if (tenantId) {
-      fetchUsers();
-    } else {
-      console.warn("Still no Tenant ID found in localStorage.");
-    }
+    if (tenantId) fetchUsers();
   }, [tenantId]);
 
-  // 2. Handle Add User
-  const handleAddUser = async (e) => {
+  // 2. Open Modal for Create
+  const openCreateModal = () => {
+    setEditingUser(null);
+    setFormData({ email: '', fullName: '', password: '', role: 'user' });
+    setIsModalOpen(true);
+  };
+
+  // 3. Open Modal for Edit
+  const openEditModal = (user) => {
+    setEditingUser(user);
+    setFormData({ 
+      email: user.email, 
+      fullName: user.full_name, 
+      password: '', // Leave empty to keep existing password
+      role: user.role 
+    });
+    setIsModalOpen(true);
+  };
+
+  // 4. Handle Submit (Create or Update)
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!tenantId) {
-      alert("System Error: Your session is missing the Tenant ID. Please logout and login again.");
-      return;
-    }
-
     setLoading(true);
+
     try {
-      const res = await axios.post(
-        `http://localhost:5000/api/tenants/${tenantId}/users`, 
-        newUser,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      if (res.data.success) {
-        alert('User added successfully!');
-        setIsModalOpen(false);
-        setNewUser({ email: '', fullName: '', password: '', role: 'user' });
-        fetchUsers();
+      if (editingUser) {
+        // --- UPDATE EXISTING USER ---
+        await axios.put(
+          `http://localhost:5000/api/tenants/${tenantId}/users/${editingUser.id}`,
+          { fullName: formData.fullName, role: formData.role },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        alert('User updated successfully');
+      } else {
+        // --- CREATE NEW USER ---
+        await axios.post(
+          `http://localhost:5000/api/tenants/${tenantId}/users`, 
+          formData,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        alert('User added successfully');
       }
+
+      setIsModalOpen(false);
+      fetchUsers(); // Refresh list
+
     } catch (error) {
-      console.error(error);
-      const msg = error.response?.data?.message || "Failed to add user";
+      const msg = error.response?.data?.message || "Operation failed";
       alert(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = () => {
-    alert("Delete feature coming soon!");
+  // 5. Handle Delete
+  const handleDelete = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
+
+    try {
+      await axios.delete(`http://localhost:5000/api/tenants/${tenantId}/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert("User deleted");
+      fetchUsers(); // Refresh list
+    } catch (error) {
+      alert("Failed to delete user");
+    }
   };
 
   return (
@@ -105,10 +126,9 @@ const UserList = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Team Members</h2>
         
-        {/* Only show button if we have a valid tenant ID */}
         {tenantId && (
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
             className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -117,101 +137,112 @@ const UserList = () => {
         )}
       </div>
 
-      {/* Warning Banner if ID is missing */}
-      {!tenantId ? (
-        <div className="p-4 bg-yellow-100 text-yellow-800 rounded border border-yellow-200">
-          <strong>⚠️ Session Issue:</strong> We cannot identify your organization ID. 
-          <br />
-          Please <button onClick={() => { localStorage.clear(); window.location.href='/login'; }} className="underline font-bold">Logout</button> and Log in again to fix this.
-        </div>
-      ) : (
-        <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+      <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    user.role === 'tenant_admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {user.role === 'tenant_admin' ? <ShieldAlert className="w-3 h-3 mr-1"/> : <Shield className="w-3 h-3 mr-1"/>}
+                    {user.role === 'tenant_admin' ? 'Admin' : 'Member'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {user.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  {/* Edit Button */}
+                  <button 
+                    onClick={() => openEditModal(user)} 
+                    className="text-blue-600 hover:text-blue-900 p-2 mr-2"
+                    title="Edit User"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Delete Button */}
+                  <button 
+                    onClick={() => handleDelete(user.id)} 
+                    className="text-red-600 hover:text-red-900 p-2"
+                    title="Delete User"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.length === 0 ? (
-                <tr><td colSpan="5" className="px-6 py-4 text-center text-gray-500">No users found</td></tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
-                          <User className="w-5 h-5" />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.role === 'tenant_admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {user.role === 'tenant_admin' ? <ShieldAlert className="w-3 h-3 mr-1"/> : <Shield className="w-3 h-3 mr-1"/>}
-                        {user.role === 'tenant_admin' ? 'Admin' : 'Member'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {user.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button onClick={handleDelete} className="text-red-600 hover:text-red-900 p-2">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Add User Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Invite New Team Member">
-        <form onSubmit={handleAddUser} className="space-y-4">
+      {/* Modal (Shared for Create and Edit) */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={editingUser ? "Edit User" : "Invite New Team Member"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input 
-            label="Full Name" value={newUser.fullName} required placeholder="John Doe"
-            onChange={(e) => setNewUser({...newUser, fullName: e.target.value})}
+            label="Full Name" value={formData.fullName} required 
+            onChange={(e) => setFormData({...formData, fullName: e.target.value})}
           />
           <Input 
-            label="Email Address" type="email" value={newUser.email} required placeholder="john@company.com"
-            onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+            label="Email Address" type="email" value={formData.email} required 
+            disabled={!!editingUser} // Cannot edit email once created
+            className={editingUser ? "bg-gray-100 cursor-not-allowed" : ""}
+            onChange={(e) => setFormData({...formData, email: e.target.value})}
           />
-          <Input 
-            label="Temporary Password" type="password" value={newUser.password} required placeholder="******"
-            onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-          />
+          
+          {/* Only show password field for new users */}
+          {!editingUser && (
+            <Input 
+              label="Temporary Password" type="password" value={formData.password} required 
+              onChange={(e) => setFormData({...formData, password: e.target.value})}
+            />
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={newUser.role}
-              onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+              value={formData.role}
+              onChange={(e) => setFormData({...formData, role: e.target.value})}
             >
               <option value="user">Regular User</option>
               <option value="tenant_admin">Tenant Admin</option>
             </select>
           </div>
+          
           <div className="pt-2">
-            <Button type="submit" disabled={loading}>{loading ? 'Adding...' : 'Add User'}</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Saving...' : (editingUser ? 'Update User' : 'Add User')}
+            </Button>
           </div>
         </form>
       </Modal>
