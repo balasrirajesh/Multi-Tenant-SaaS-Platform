@@ -1,59 +1,39 @@
-// const express = require('express');
-// const router = express.Router();
-// const { login } = require('../controllers/authController');
-// const authMiddleware = require('../middleware/authMiddleware');
-// const { getCurrentUser } = require('../controllers/authController');
+// const router = require('express').Router();
+// const auth = require('../middleware/authMiddleware');
+// const { 
+//   registerTenant, 
+//   login, 
+//   getCurrentUser, 
+//   logout 
+// } = require('../controllers/authController');
 
-// router.get('/me', authMiddleware, getCurrentUser);
-
+// // Public Routes
+// router.post('/register-tenant', registerTenant); // <-- The new one
 // router.post('/login', login);
 
-
-// // Placeholder routes (logic will be added step-by-step)
-// router.post('/register-tenant', (req, res) => {
-//   res.status(501).json({ success: false, message: 'Not implemented yet' });
-// });
-
-// router.post('/login', (req, res) => {
-//   res.status(501).json({ success: false, message: 'Not implemented yet' });
-// });
-
-// router.get('/me', (req, res) => {
-//   res.status(501).json({ success: false, message: 'Not implemented yet' });
-// });
-
-// router.post('/logout', (req, res) => {
-//   res.status(501).json({ success: false, message: 'Not implemented yet' });
-// });
+// // Protected Routes
+// router.get('/me', auth, getCurrentUser);
+// router.post('/logout', auth, logout);
 
 // module.exports = router;
 
 
-const express = require('express');
-const router = express.Router();
 
+const router = require('express').Router();
 const authMiddleware = require('../middleware/authMiddleware');
-const {
-  login,
-  getCurrentUser,
-  logout
+const { 
+  registerTenant, // Import the new function
+  login, 
+  getCurrentUser, 
+  logout 
 } = require('../controllers/authController');
 
-// LOGIN
+// Public Routes
+router.post('/register-tenant', registerTenant); // <--- This now points to real logic
 router.post('/login', login);
 
-// GET CURRENT USER
+// Protected Routes
 router.get('/me', authMiddleware, getCurrentUser);
-
-// LOGOUT
 router.post('/logout', authMiddleware, logout);
-
-// PLACEHOLDER (keep only if required by instructions)
-router.post('/register-tenant', (req, res) => {
-  res.status(501).json({
-    success: false,
-    message: 'Not implemented yet'
-  });
-});
 
 module.exports = router;
