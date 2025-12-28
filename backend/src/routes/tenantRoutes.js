@@ -1,17 +1,20 @@
 const express = require('express');
 const router = express.Router();
 
+// Middleware Imports
 const authMiddleware = require('../middleware/authMiddleware');
 const allowRoles = require('../middleware/roleMiddleware');
 const tenantGuard = require('../middleware/tenantMiddleware');
-const { getTenant, updateTenant } = require('../controllers/tenantController');
-const { listTenants } = require('../controllers/tenantController');
-const { listTenants, createTenant } = require('../controllers/tenantController'); // Import it here
 
-// ...
-router.post('/', auth, allow('super_admin'), createTenant); // Use it here
-router.post('/', auth, allow('super_admin'), createTenant);//use it to super admin to create a tenant
+// Controller Imports (Consolidated into one block)
+const { 
+  listTenants, 
+  createTenant, 
+  getTenant, 
+  updateTenant 
+} = require('../controllers/tenantController');
 
+// 1. List All Tenants (Super Admin Only)
 router.get(
   '/',
   authMiddleware,
@@ -19,15 +22,25 @@ router.get(
   listTenants
 );
 
-// Get tenant details
+// 2. Create New Tenant (Super Admin Only)
+router.post(
+  '/',
+  authMiddleware,
+  allowRoles('super_admin'),
+  createTenant
+);
+
+// 3. Get Tenant Details
+// (Super Admin can see any; Tenant Admin can see their own)
 router.get(
   '/:tenantId',
   authMiddleware,
-  tenantGuard('tenantId'),
+  // Note: tenantGuard ensures a tenant_admin only accesses their own ID
+  tenantGuard('tenantId'), 
   getTenant
 );
 
-// Update tenant
+// 4. Update Tenant
 router.put(
   '/:tenantId',
   authMiddleware,
