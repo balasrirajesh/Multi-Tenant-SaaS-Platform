@@ -16,20 +16,30 @@ A production-ready, multi-tenant Project Management System built with Node.js, R
   - **Tenant Admin:** Full control over their own organization's users and projects.
   - **User:** Read/Write access to assigned tasks and projects only.
 - **Password Security:** All passwords are hashed using `bcryptjs`.
+- **Protected Actions:**
+  - **Super Admin Immunity:** Logic prevents Super Admins from being deleted.
+  - **Self-Deletion Block:** Tenant Admins cannot delete their own active organization.
 
 ### 3. Subscription Management & Limits
 - **Tiered Plans:** Support for Free, Pro, and Enterprise tiers.
 - **Limit Enforcement:** The system checks `max_projects` and `max_users` limits *before* inserting new records.
-  - *Example:* A "Free" tenant cannot create more than 3 projects.
-- **Dashboard Visualization:** Real-time progress bars showing resource usage vs. plan limits.
+  - *Example:* A "Basic" tenant cannot create more than 3 projects.
+- **Dashboard Visualization:**
+  - **Real-time Progress Bars:** Visual indicators (Blue/Green/Red) showing resource usage vs. plan limits.
+  - **Exact Counters:** Explicitly displays "Used / Max" (e.g., `2 / 3`) for clarity.
 
 ### 4. Project & Task Management (CRUD)
-- **Projects:** Create, Edit, Delete (with ownership checks).
+- **Projects:**
+  - **Create:** Limit-checked creation.
+  - **Edit:** Renaming and description updates available via "Edit Pencil" icon.
+  - **Delete:** Secure deletion with ownership checks.
 - **Tasks:**
-  - Create and Assign to specific team members.
-  - **Status Toggling:** One-click completion status updates.
+  - **Create:** Assign to specific team members with Priority levels (High/Medium/Low).
+  - **Edit:** Inline editing of task titles to fix typos or updates.
+  - **Status Toggling:** One-click circular checkbox to instantly toggle between "Todo" and "Completed".
   - **Prioritization:** Visual badges for High/Medium/Low priority.
   - **Cascade Deletion:** Deleting a project automatically cleans up its tasks.
+  - **Task Deletion:** Individual tasks can be deleted with a confirmation prompt.
 
 ### 5. Audit Logging
 - Critical actions (Login, Create Tenant, Delete User, etc.) are logged to an `audit_logs` table for compliance and security tracking.
@@ -110,6 +120,8 @@ The backend exposes 19+ endpoints. Key endpoints include:
 | `DELETE` | `/api/tenants/:id` | Delete tenant & all data |
 | `GET` | `/api/projects` | List projects for current tenant |
 | `POST` | `/api/projects` | Create project (Limit checked) |
-| `PUT` | `/api/projects/:id` | Update project details |
+| `PUT` | `/api/projects/:id` | Update project details (Edit) |
 | `POST` | `/api/tasks` | Create new task |
+| `PUT` | `/api/tasks/:id` | Update task title (Edit) |
 | `PATCH` | `/api/tasks/:id/status` | Toggle task completion |
+| `DELETE` | `/api/tasks/:id` | Delete individual task |

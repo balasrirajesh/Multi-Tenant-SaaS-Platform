@@ -1,10 +1,7 @@
-// import { useState, useEffect } from 'react';
+// import { useEffect, useState } from 'react';
 // import { useParams, useNavigate } from 'react-router-dom';
-// import { ArrowLeft, CheckCircle, Circle } from 'lucide-react';
 // import api from '../../api/axios';
-// import Button from '../../components/Button'; // Ensure this path is correct
-// import Modal from '../../components/Modal';   // Ensure this path is correct
-// import Input from '../../components/Input';   // Ensure this path is correct
+// import { Plus, Trash2, CheckCircle, Circle, ArrowLeft, Edit2, Save, X } from 'lucide-react'; // Added Edit2, Save, X
 
 // const ProjectDetails = () => {
 //   const { id } = useParams();
@@ -12,280 +9,449 @@
 //   const [project, setProject] = useState(null);
 //   const [tasks, setTasks] = useState([]);
 //   const [loading, setLoading] = useState(true);
-//   const [isModalOpen, setIsModalOpen] = useState(false);
-//   const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' });
+  
+//   // Edit Mode States
+//   const [isEditing, setIsEditing] = useState(false);
+//   const [editName, setEditName] = useState('');
+//   const [editDesc, setEditDesc] = useState('');
+
+//   // Task Form State
+//   const [showTaskModal, setShowTaskModal] = useState(false);
+//   const [newTask, setNewTask] = useState({ title: '', priority: 'medium' });
 
 //   useEffect(() => {
-//     const fetchData = async () => {
-//       try {
-//         // Since we don't have a "Get One Project" API yet, we filter the list
-//         const projRes = await api.get('/projects');
-//         const foundProject = projRes.data.data.find(p => p.id === parseInt(id) || p.id === id);
-//         setProject(foundProject);
-
-//         // Fetch tasks
-//         const taskRes = await api.get('/tasks');
-//         setTasks(taskRes.data.data.filter(t => t.project_id === parseInt(id) || t.project_id === id));
-//       } catch (err) {
-//         console.error(err);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//     fetchData();
+//     fetchProjectData();
 //   }, [id]);
 
-//   const handleCreateTask = async (e) => {
-//     e.preventDefault();
+//   const fetchProjectData = async () => {
 //     try {
-//       // Send projectId as part of the body
-//       await api.post('/tasks', { ...newTask, projectId: id });
-//       // Refresh tasks
-//       const taskRes = await api.get('/tasks');
-//       setTasks(taskRes.data.data.filter(t => t.project_id === parseInt(id) || t.project_id === id));
-//       setIsModalOpen(false);
-//       setNewTask({ title: '', description: '', priority: 'medium' });
+//       const [projRes, taskRes] = await Promise.all([
+//         api.get(`/projects`), // We filter locally since API returns all
+//         api.get(`/tasks?projectId=${id}`)
+//       ]);
+      
+//       const foundProject = projRes.data.data.find(p => p.id === id);
+//       if (!foundProject) {
+//         navigate('/projects'); 
+//         return;
+//       }
+      
+//       setProject(foundProject);
+//       setEditName(foundProject.name);        // Initialize edit form
+//       setEditDesc(foundProject.description); // Initialize edit form
+//       setTasks(taskRes.data.data);
 //     } catch (err) {
-//       alert("Failed to create task");
+//       console.error("Failed to load project", err);
+//     } finally {
+//       setLoading(false);
 //     }
 //   };
 
-//   if (loading) return <div className="p-6">Loading...</div>;
-//   if (!project) return <div className="p-6">Project not found</div>;
+//   // --- 1. HANDLE UPDATE PROJECT ---
+//   const handleUpdateProject = async () => {
+//     try {
+//       const res = await api.put(`/projects/${id}`, {
+//         name: editName,
+//         description: editDesc
+//       });
+//       setProject(res.data.data); // Update local state
+//       setIsEditing(false);       // Exit edit mode
+//     } catch (err) {
+//       alert("Failed to update project");
+//     }
+//   };
+
+//   // --- 2. HANDLE CREATE TASK ---
+//   const handleCreateTask = async (e) => {
+//     e.preventDefault();
+//     try {
+//       await api.post('/tasks', { ...newTask, projectId: id });
+//       setShowTaskModal(false);
+//       setNewTask({ title: '', priority: 'medium' });
+//       fetchProjectData(); // Refresh list
+//     } catch (err) {
+//       console.error(err);
+//     }
+//   };
+
+//   // --- 3. HANDLE DELETE TASK ---
+//   const handleDeleteTask = async (taskId) => {
+//     if(!window.confirm("Delete this task?")) return;
+//     try {
+//       await api.delete(`/tasks/${taskId}`);
+//       setTasks(tasks.filter(t => t.id !== taskId));
+//     } catch(err) { console.error(err); }
+//   };
+
+//   // --- 4. HANDLE TOGGLE STATUS ---
+//   const handleToggleStatus = async (task) => {
+//     const newStatus = task.status === 'completed' ? 'todo' : 'completed';
+//     try {
+//       await api.patch(`/tasks/${task.id}/status`, { status: newStatus });
+//       fetchProjectData(); // Refresh to see changes
+//     } catch (err) { console.error(err); }
+//   };
+
+//   if (loading) return <div className="p-8 text-center">Loading...</div>;
+//   if (!project) return null;
 
 //   return (
-//     <div>
-//       <button onClick={() => navigate('/projects')} className="flex items-center text-gray-500 mb-4">
-//         <ArrowLeft className="w-4 h-4 mr-1" /> Back
+//     <div className="max-w-4xl mx-auto">
+//       <button onClick={() => navigate('/projects')} className="flex items-center text-gray-500 mb-4 hover:text-gray-700">
+//         <ArrowLeft className="w-4 h-4 mr-1" /> Back to Projects
 //       </button>
-//       <div className="flex justify-between items-start mb-6">
-//         <h1 className="text-3xl font-bold">{project.name}</h1>
-//         <Button onClick={() => setIsModalOpen(true)}>Add Task</Button>
-//       </div>
-      
-//       <div className="bg-white shadow rounded-lg border border-gray-200">
-//          <div className="p-4 border-b font-medium">Tasks</div>
-//          <div className="divide-y">
-//             {tasks.map(task => (
-//               <div key={task.id} className="p-4 flex items-center">
-//                 {task.status === 'completed' ? <CheckCircle className="text-green-500 mr-3"/> : <Circle className="text-gray-400 mr-3"/>}
-//                 <div>
-//                   <div className="font-medium">{task.title}</div>
-//                   <div className="text-sm text-gray-500">{task.description}</div>
-//                 </div>
-//               </div>
-//             ))}
-//             {tasks.length === 0 && <div className="p-4 text-gray-500 text-center">No tasks yet.</div>}
-//          </div>
+
+//       {/* --- PROJECT HEADER (View vs Edit Mode) --- */}
+//       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
+//         {isEditing ? (
+//           // EDIT MODE FORM
+//           <div className="space-y-3">
+//             <input 
+//               type="text" 
+//               value={editName}
+//               onChange={(e) => setEditName(e.target.value)}
+//               className="w-full text-2xl font-bold border-b-2 border-blue-500 focus:outline-none"
+//             />
+//             <input 
+//               type="text" 
+//               value={editDesc}
+//               onChange={(e) => setEditDesc(e.target.value)}
+//               className="w-full text-gray-600 border-b border-gray-300 focus:outline-none"
+//             />
+//             <div className="flex space-x-2 mt-2">
+//               <button onClick={handleUpdateProject} className="flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+//                 <Save className="w-4 h-4 mr-1" /> Save
+//               </button>
+//               <button onClick={() => setIsEditing(false)} className="flex items-center px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600">
+//                 <X className="w-4 h-4 mr-1" /> Cancel
+//               </button>
+//             </div>
+//           </div>
+//         ) : (
+//           // VIEW MODE
+//           <div className="flex justify-between items-start">
+//             <div>
+//               <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+//                 {project.name}
+//                 <button onClick={() => setIsEditing(true)} className="ml-3 text-gray-400 hover:text-blue-600">
+//                   <Edit2 className="w-5 h-5" />
+//                 </button>
+//               </h1>
+//               <p className="text-gray-600 mt-1">{project.description}</p>
+//             </div>
+//             <button 
+//               onClick={() => setShowTaskModal(true)}
+//               className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700"
+//             >
+//               <Plus className="w-4 h-4 mr-2" /> Add Task
+//             </button>
+//           </div>
+//         )}
 //       </div>
 
-//       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Task">
-//         <form onSubmit={handleCreateTask} className="space-y-4">
-//           <Input label="Title" value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
-//           <Input label="Description" value={newTask.description} onChange={e => setNewTask({...newTask, description: e.target.value})} />
-//           <Button type="submit">Save Task</Button>
-//         </form>
-//       </Modal>
+//       {/* --- TASKS LIST --- */}
+//       <div className="space-y-3">
+//         {tasks.map(task => (
+//           <div key={task.id} className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between ${task.status === 'completed' ? 'opacity-60' : ''}`}>
+//             <div className="flex items-center">
+//               <button onClick={() => handleToggleStatus(task)} className="mr-3 text-gray-400 hover:text-green-600">
+//                 {task.status === 'completed' ? <CheckCircle className="w-6 h-6 text-green-500" /> : <Circle className="w-6 h-6" />}
+//               </button>
+//               <div>
+//                 <h4 className={`font-medium ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+//                   {task.title}
+//                 </h4>
+//                 <span className={`text-xs px-2 py-0.5 rounded uppercase ${
+//                   task.priority === 'high' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+//                 }`}>
+//                   {task.priority}
+//                 </span>
+//               </div>
+//             </div>
+//             <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-500">
+//               <Trash2 className="w-4 h-4" />
+//             </button>
+//           </div>
+//         ))}
+//         {tasks.length === 0 && <p className="text-center text-gray-500 py-8">No tasks yet. Add one above!</p>}
+//       </div>
+
+//       {/* --- ADD TASK MODAL --- */}
+//       {showTaskModal && (
+//         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+//           <div className="bg-white rounded-xl p-6 w-full max-w-md">
+//             <h3 className="text-lg font-bold mb-4">New Task</h3>
+//             <form onSubmit={handleCreateTask}>
+//               <input 
+//                 className="w-full border p-2 rounded mb-3" 
+//                 placeholder="Task Title" 
+//                 value={newTask.title}
+//                 onChange={e => setNewTask({...newTask, title: e.target.value})}
+//                 required 
+//               />
+//               <select 
+//                 className="w-full border p-2 rounded mb-4"
+//                 value={newTask.priority}
+//                 onChange={e => setNewTask({...newTask, priority: e.target.value})}
+//               >
+//                 <option value="low">Low Priority</option>
+//                 <option value="medium">Medium Priority</option>
+//                 <option value="high">High Priority</option>
+//               </select>
+//               <div className="flex justify-end space-x-2">
+//                 <button type="button" onClick={() => setShowTaskModal(false)} className="px-4 py-2 text-gray-600">Cancel</button>
+//                 <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Create Task</button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
 //     </div>
 //   );
 // };
 
 // export default ProjectDetails;
 
-
-
-
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Circle, Trash2, Edit } from 'lucide-react'; 
 import api from '../../api/axios';
-import Button from '../../components/Button';
-import Modal from '../../components/Modal';
-import Input from '../../components/Input';
+import { Plus, Trash2, CheckCircle, Circle, ArrowLeft, Edit2, Save, X } from 'lucide-react';
 
 const ProjectDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' });
+  // Project Edit State
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  const [editProjName, setEditProjName] = useState('');
+  const [editProjDesc, setEditProjDesc] = useState('');
 
-  // 1. Fetch Data
-  const fetchData = async () => {
+  // Task Edit State
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+
+  // Task Create State
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [newTask, setNewTask] = useState({ title: '', priority: 'medium' });
+
+  useEffect(() => {
+    fetchProjectData();
+  }, [id]);
+
+  const fetchProjectData = async () => {
     try {
-      // Fetch Project Info
-      // (Optimally we should have a GET /projects/:id endpoint, but filtering works for now)
-      const projRes = await api.get('/projects');
-      const foundProject = projRes.data.data.find(p => p.id === parseInt(id) || p.id === id);
-      setProject(foundProject);
-
-      // Fetch Tasks
-      const taskRes = await api.get(`/tasks?projectId=${id}`); 
-      // If backend filtering is set up, this is cleaner. 
-      // If not, we filter client side:
-      const allTasks = taskRes.data.data;
-      const myTasks = allTasks.filter(t => t.project_id === (foundProject?.id || id) || t.project_id === parseInt(id));
+      const [projRes, taskRes] = await Promise.all([
+        api.get(`/projects`),
+        api.get(`/tasks?projectId=${id}`)
+      ]);
       
-      setTasks(myTasks);
+      const foundProject = projRes.data.data.find(p => p.id === id);
+      if (!foundProject) {
+        navigate('/projects'); 
+        return;
+      }
+      
+      setProject(foundProject);
+      setEditProjName(foundProject.name);
+      setEditProjDesc(foundProject.description);
+      setTasks(taskRes.data.data);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load project", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
+  // --- 1. UPDATE PROJECT ---
+  const handleUpdateProject = async () => {
+    try {
+      const res = await api.put(`/projects/${id}`, {
+        name: editProjName,
+        description: editProjDesc
+      });
+      setProject(res.data.data);
+      setIsEditingProject(false);
+    } catch (err) { alert("Failed to update project"); }
+  };
 
-  // 2. Create Task
+  // --- 2. CREATE TASK ---
   const handleCreateTask = async (e) => {
     e.preventDefault();
     try {
       await api.post('/tasks', { ...newTask, projectId: id });
-      setIsModalOpen(false);
-      setNewTask({ title: '', description: '', priority: 'medium' });
-      fetchData(); // Refresh list
-    } catch (err) {
-      alert("Failed to create task");
-    }
+      setShowTaskModal(false);
+      setNewTask({ title: '', priority: 'medium' });
+      fetchProjectData();
+    } catch (err) { console.error(err); }
   };
 
-  // 3. Toggle Status (Complete/Todo)
+  // --- 3. DELETE TASK ---
+  const handleDeleteTask = async (taskId) => {
+    if(!window.confirm("Delete this task?")) return;
+    try {
+      await api.delete(`/tasks/${taskId}`);
+      setTasks(tasks.filter(t => t.id !== taskId));
+    } catch(err) { console.error(err); }
+  };
+
+  // --- 4. TOGGLE TASK STATUS ---
   const handleToggleStatus = async (task) => {
     const newStatus = task.status === 'completed' ? 'todo' : 'completed';
     try {
       await api.patch(`/tasks/${task.id}/status`, { status: newStatus });
-      // Optimistic update (feels faster)
-      setTasks(tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
-    } catch (err) {
-      alert("Failed to update status");
-      fetchData(); // Revert on error
-    }
+      fetchProjectData();
+    } catch (err) { console.error(err); }
   };
 
-  // 4. Delete Task
-  const handleDeleteTask = async (taskId) => {
-    if (!window.confirm("Are you sure you want to delete this task?")) return;
+  // --- 5. EDIT TASK TITLE (NEW) ---
+  const startEditingTask = (task) => {
+    setEditingTaskId(task.id);
+    setEditTaskTitle(task.title);
+  };
+
+  const saveTaskEdit = async (taskId) => {
     try {
-      await api.delete(`/tasks/${taskId}`);
-      setTasks(tasks.filter(t => t.id !== taskId));
-    } catch (err) {
-      alert("Failed to delete task");
-    }
+      await api.put(`/tasks/${taskId}`, { title: editTaskTitle });
+      setTasks(tasks.map(t => t.id === taskId ? { ...t, title: editTaskTitle } : t));
+      setEditingTaskId(null);
+    } catch (err) { alert("Failed to update task"); }
   };
 
-  if (loading) return <div className="p-6">Loading Project...</div>;
-  if (!project) return <div className="p-6">Project not found.</div>;
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (!project) return null;
 
   return (
-    <div>
-      <button onClick={() => navigate('/projects')} className="flex items-center text-gray-500 mb-4 hover:text-blue-600 transition-colors">
+    <div className="max-w-4xl mx-auto">
+      <button onClick={() => navigate('/projects')} className="flex items-center text-gray-500 mb-4 hover:text-gray-700">
         <ArrowLeft className="w-4 h-4 mr-1" /> Back to Projects
       </button>
 
-      {/* Project Header */}
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-          <p className="text-gray-600 mt-1">{project.description}</p>
-          <div className="mt-2">
-            <span className={`px-2 py-1 rounded text-xs uppercase font-bold tracking-wide ${
-              project.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}>
-              {project.status}
-            </span>
+      {/* --- PROJECT HEADER --- */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
+        {isEditingProject ? (
+          <div className="space-y-3">
+            <input 
+              value={editProjName}
+              onChange={(e) => setEditProjName(e.target.value)}
+              className="w-full text-2xl font-bold border-b-2 border-blue-500 focus:outline-none"
+            />
+            <input 
+              value={editProjDesc}
+              onChange={(e) => setEditProjDesc(e.target.value)}
+              className="w-full text-gray-600 border-b border-gray-300 focus:outline-none"
+            />
+            <div className="flex space-x-2 mt-2">
+              <button onClick={handleUpdateProject} className="flex items-center px-3 py-1 bg-green-600 text-white rounded text-sm"><Save className="w-3 h-3 mr-1" /> Save</button>
+              <button onClick={() => setIsEditingProject(false)} className="flex items-center px-3 py-1 bg-gray-500 text-white rounded text-sm"><X className="w-3 h-3 mr-1" /> Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                {project.name}
+                <button onClick={() => setIsEditingProject(true)} className="ml-3 text-gray-400 hover:text-blue-600">
+                  <Edit2 className="w-5 h-5" />
+                </button>
+              </h1>
+              <p className="text-gray-600 mt-1">{project.description}</p>
+            </div>
+            <button 
+              onClick={() => setShowTaskModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Add Task
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* --- TASKS LIST --- */}
+      <div className="space-y-3">
+        {tasks.map(task => (
+          <div key={task.id} className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between ${task.status === 'completed' ? 'opacity-60' : ''}`}>
+            
+            {/* TASK EDIT MODE */}
+            {editingTaskId === task.id ? (
+              <div className="flex-1 flex items-center space-x-2">
+                <input 
+                  value={editTaskTitle}
+                  onChange={(e) => setEditTaskTitle(e.target.value)}
+                  className="flex-1 border-b border-blue-500 focus:outline-none px-1"
+                  autoFocus
+                />
+                <button onClick={() => saveTaskEdit(task.id)} className="text-green-600 hover:bg-green-50 p-1 rounded"><CheckCircle className="w-5 h-5"/></button>
+                <button onClick={() => setEditingTaskId(null)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X className="w-5 h-5"/></button>
+              </div>
+            ) : (
+              // TASK VIEW MODE
+              <div className="flex items-center flex-1">
+                <button onClick={() => handleToggleStatus(task)} className="mr-3 text-gray-400 hover:text-green-600">
+                  {task.status === 'completed' ? <CheckCircle className="w-6 h-6 text-green-500" /> : <Circle className="w-6 h-6" />}
+                </button>
+                <div className="flex-1">
+                  <div className="flex items-center group">
+                    <h4 className={`font-medium mr-2 ${task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                      {task.title}
+                    </h4>
+                    {/* Pencil only appears on hover */}
+                    <button onClick={() => startEditingTask(task)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-opacity">
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded uppercase ${
+                    task.priority === 'high' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {task.priority}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* DELETE BUTTON (Always visible) */}
+            {editingTaskId !== task.id && (
+              <button onClick={() => handleDeleteTask(task.id)} className="ml-4 text-gray-400 hover:text-red-500">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ))}
+        {tasks.length === 0 && <p className="text-center text-gray-500 py-8">No tasks yet.</p>}
+      </div>
+
+      {/* --- ADD TASK MODAL --- */}
+      {showTaskModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4">New Task</h3>
+            <form onSubmit={handleCreateTask}>
+              <input 
+                className="w-full border p-2 rounded mb-3" 
+                placeholder="Task Title" 
+                value={newTask.title}
+                onChange={e => setNewTask({...newTask, title: e.target.value})}
+                required 
+              />
+              <select 
+                className="w-full border p-2 rounded mb-4"
+                value={newTask.priority}
+                onChange={e => setNewTask({...newTask, priority: e.target.value})}
+              >
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+              </select>
+              <div className="flex justify-end space-x-2">
+                <button type="button" onClick={() => setShowTaskModal(false)} className="px-4 py-2 text-gray-600">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">Create Task</button>
+              </div>
+            </form>
           </div>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>+ Add Task</Button>
-      </div>
-      
-      {/* Task List */}
-      <div className="bg-white shadow rounded-lg border border-gray-200">
-         <div className="p-4 border-b font-medium bg-gray-50 flex justify-between items-center">
-            <span>Project Tasks ({tasks.length})</span>
-         </div>
-         <div className="divide-y">
-            {tasks.length === 0 ? (
-                <div className="p-8 text-center text-gray-500 italic">No tasks yet. Create one to get started!</div>
-            ) : (
-                tasks.map(task => (
-                <div key={task.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors group">
-                    <div className="flex items-center cursor-pointer" onClick={() => handleToggleStatus(task)}>
-                    {task.status === 'completed' ? (
-                        <CheckCircle className="text-green-500 mr-3 w-6 h-6 flex-shrink-0" />
-                    ) : (
-                        <Circle className="text-gray-400 mr-3 w-6 h-6 flex-shrink-0 group-hover:text-blue-500" />
-                    )}
-                    
-                    <div className={`${task.status === 'completed' ? 'opacity-50 line-through' : ''}`}>
-                        <div className="font-medium text-gray-900">{task.title}</div>
-                        {task.description && <div className="text-sm text-gray-500">{task.description}</div>}
-                        
-                        <div className="mt-1 flex items-center gap-2">
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${
-                            task.priority === 'high' ? 'bg-red-100 text-red-800' : 
-                            task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
-                            }`}>
-                            {task.priority}
-                            </span>
-                        </div>
-                    </div>
-                    </div>
-
-                    <div className="flex items-center">
-                        <button 
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="text-gray-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
-                            title="Delete Task"
-                        >
-                            <Trash2 className="w-5 h-5" />
-                        </button>
-                    </div>
-                </div>
-                ))
-            )}
-         </div>
-      </div>
-
-      {/* Create Task Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Task">
-        <form onSubmit={handleCreateTask} className="space-y-4">
-          <Input 
-            label="Task Title" 
-            value={newTask.title} 
-            required 
-            onChange={e => setNewTask({...newTask, title: e.target.value})} 
-            placeholder="e.g. Design Homepage"
-          />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea 
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows="3"
-                value={newTask.description}
-                onChange={e => setNewTask({...newTask, description: e.target.value})}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-            <select 
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={newTask.priority}
-              onChange={e => setNewTask({...newTask, priority: e.target.value})}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-          <Button type="submit">Create Task</Button>
-        </form>
-      </Modal>
+      )}
     </div>
   );
 };
