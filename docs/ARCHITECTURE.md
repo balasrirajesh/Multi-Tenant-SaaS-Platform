@@ -45,11 +45,11 @@ The schema relies on `tenant_id` UUIDs to partition data.
 4.  Client stores JWT in `localStorage`.
 
 ### Role-Based Access Control (RBAC)
-| Role | Scope | Permissions |
-| :--- | :--- | :--- |
-| **Super Admin** | Global | Create/Delete Tenants, View System Audit Logs. |
-| **Tenant Admin** | Tenant | Manage Users, Projects, Billing; Cannot delete System. |
-| **User** | Tenant | Read/Write assigned Projects/Tasks; No Admin access. |
+| Role                 | Scope  |                   Permissions                             |
+| :------------------: | :-----:| :------------------------------------------------------:  |
+| **Super Admin**      | Global |   Create/Delete Tenants, View System Audit Logs.          |
+| **Tenant Admin**     | Tenant |  Manage Users, Projects, Billing; Cannot delete System.   |
+| **User**             | Tenant |   Read/Write assigned Projects/Tasks; No Admin access.    |
 
 ---
 
